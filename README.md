@@ -11,12 +11,14 @@ OTEL_TRACING_INSECURE_MODE=true
 ## sample
 ```
 import (
-	"log"
+	"context"
+
 	"net/http"
 
 	trace "github.com/faizal-asep-outlook/otel-tracing"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -25,11 +27,15 @@ func main() {
 		log.Fatal(err)
 	}
 	r := gin.New()
-	r.Use(trace.MiddlewareGinTrace())
+	r.Use(
+		trace.MiddlewareGinTrace(),
+		trace.MiddlewareLogger(),
+	)
 
 	r.GET("/ping", func(c *gin.Context) {
 		_, span := trace.TraceStart(c.Request.Context(), "ping process")
 		defer span.End()
+		log.WithContext(c.Request.Context()).Info("testing")
 		c.String(http.StatusOK, "pong")
 	})
 

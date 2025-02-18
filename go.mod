@@ -5,10 +5,15 @@ go 1.24.0
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/gin-gonic/gin v1.10.0
+	github.com/sirupsen/logrus v1.9.3
+	go.opentelemetry.io/contrib/bridges/otellogrus v0.9.0
 	go.opentelemetry.io/otel v1.34.0
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.10.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.34.0
+	go.opentelemetry.io/otel/exporters/stdout/stdoutlog v0.10.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.34.0
 	go.opentelemetry.io/otel/sdk v1.34.0
+	go.opentelemetry.io/otel/sdk/log v0.10.0
 	go.opentelemetry.io/otel/trace v1.34.0
 	google.golang.org/grpc v1.70.0
 )
@@ -40,6 +45,7 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.34.0 // indirect
+	go.opentelemetry.io/otel/log v0.10.0 // indirect
 	go.opentelemetry.io/otel/metric v1.34.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	golang.org/x/arch v0.8.0 // indirect
