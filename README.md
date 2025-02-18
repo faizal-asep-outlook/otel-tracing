@@ -1,4 +1,14 @@
 # otel-tracing
+
+## environment variables
+```
+OTEL_TRACING_OTLP_ENDPOINT=127.0.0.1:4317
+OTEL_TRACING_SERVICE_NAME=service
+OTEL_TRACING_SERVICE_VERSION=1.0.0
+OTEL_TRACING_INSECURE_MODE=true
+```
+
+## sample
 ```
 import (
 	"log"
