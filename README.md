@@ -12,34 +12,34 @@ OTEL_TRACING_INSECURE_MODE=true
 ```
 import (
 	"context"
-
+	"log"
 	"net/http"
 
-	trace "github.com/faizal-asep-outlook/otel-tracing"
+	ot "github.com/faizal-asep-outlook/otel-tracing"
 
 	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	_, err := trace.InitTracer()
+
+	_, err := ot.InitTracer()
 	if err != nil {
 		log.Fatal(err)
 	}
 	r := gin.New()
 	r.Use(
-		trace.MiddlewareGinTrace(),
-		trace.MiddlewareLogger(),
+		ot.MiddlewareGinTrace(),
+		ot.MiddlewareLogger(),
 	)
 
 	r.GET("/ping", func(c *gin.Context) {
-		ctx, span := trace.TraceStart(c.Request.Context(), "ping process")
+		ctx, span := ot.TraceStart(c.Request.Context(), "ping process")
 		defer span.End()
-		log.WithContext(ctx).Info("testing")
+		ot.LogInfo(ctx, "testing")
 		c.String(http.StatusOK, "pong")
 	})
 
 	r.Run(":8080")
-	trace.ShutDown(context.Background())
+	ot.ShutDown(context.Background())
 }
 ```

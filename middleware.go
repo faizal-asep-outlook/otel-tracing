@@ -99,7 +99,7 @@ func MiddlewareLogger() gin.HandlerFunc {
 		}
 
 		// param.Path = path
-		log.WithContext(c.Request.Context()).WithFields(param).Info(path)
+		loger.WithContext(c.Request.Context()).WithFields(param).Info(path)
 		// fmt.Fprint(out, formatter(param))
 
 	}

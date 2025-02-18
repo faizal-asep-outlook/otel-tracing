@@ -3,6 +3,7 @@ package otelTracing
 import (
 	"context"
 	"fmt"
+	"runtime"
 
 	"github.com/faizal-asep-outlook/otel-tracing/config"
 	"github.com/gin-gonic/gin"
@@ -19,11 +20,26 @@ import (
 var Tracer oteltrace.Tracer
 var tracerprovider *sdktrace.TracerProvider
 var logprovider *sdklog.LoggerProvider
+var loger *logrus.Logger
+
+type noopWriter struct{}
+
+func (noopWriter) Write(p []byte) (n int, err error) {
+	return 0, nil
+}
 
 type OtelTracing interface {
 	MiddlewareGinTrace() gin.HandlerFunc
 	TraceStart(ctx context.Context, name string) (context.Context, oteltrace.Span)
 	ShutDown(ctx context.Context) error
+	LogTrace(ctx context.Context, args ...interface{})
+	LogDebug(ctx context.Context, args ...interface{})
+	LogPrint(ctx context.Context, args ...interface{})
+	LogInfo(ctx context.Context, args ...interface{})
+	LogWarn(ctx context.Context, args ...interface{})
+	LogError(ctx context.Context, args ...interface{})
+	LogFatal(ctx context.Context, args ...interface{})
+	LogPanic(ctx context.Context, args ...interface{})
 }
 
 func InitTracer() (OtelTracing, error) {
@@ -46,7 +62,9 @@ func InitTracer() (OtelTracing, error) {
 	// Create an *otellogrus.Hook and use it in your application.
 	hook := otellogrus.NewHook(config.ServiceName, otellogrus.WithLoggerProvider(lp))
 	// Set the newly created hook as a global logrus hook
-	logrus.AddHook(hook)
+	log := logrus.New()
+	log.AddHook(hook)
+	log.SetOutput(&noopWriter{})
 
 	tp, err := newTracerProvider(ctx, config, rp)
 	if err != nil {
@@ -58,6 +76,7 @@ func InitTracer() (OtelTracing, error) {
 
 	logprovider = lp
 	tracerprovider = tp
+	loger = log
 	Tracer = tp.Tracer(config.ServiceName)
 	return &otelTracing{}, nil
 }
@@ -66,6 +85,70 @@ func InitTracer() (OtelTracing, error) {
 func TraceStart(ctx context.Context, name string) (context.Context, oteltrace.Span) {
 	//nolint: spancheck
 	return Tracer.Start(ctx, name)
+}
+
+func LogTrace(ctx context.Context, args ...interface{}) {
+	if _, file, len, ok := runtime.Caller(1); ok {
+		loger.WithContext(ctx).WithField("file", fmt.Sprintf("%s(%d)", file, len)).Trace(args...)
+	} else {
+		loger.WithContext(ctx).Trace(args...)
+	}
+}
+
+func LogDebug(ctx context.Context, args ...interface{}) {
+	if _, file, len, ok := runtime.Caller(1); ok {
+		loger.WithContext(ctx).WithField("file", fmt.Sprintf("%s(%d)", file, len)).Debug(args...)
+	} else {
+		loger.WithContext(ctx).Debug(args...)
+	}
+}
+
+func LogPrint(ctx context.Context, args ...interface{}) {
+	if _, file, len, ok := runtime.Caller(1); ok {
+		loger.WithContext(ctx).WithField("file", fmt.Sprintf("%s(%d)", file, len)).Print(args...)
+	} else {
+		loger.WithContext(ctx).Print(args...)
+	}
+}
+
+func LogInfo(ctx context.Context, args ...interface{}) {
+	if _, file, len, ok := runtime.Caller(1); ok {
+		loger.WithContext(ctx).WithField("file", fmt.Sprintf("%s(%d)", file, len)).Info(args...)
+	} else {
+		loger.WithContext(ctx).Info(args...)
+	}
+}
+
+func LogWarn(ctx context.Context, args ...interface{}) {
+	if _, file, len, ok := runtime.Caller(1); ok {
+		loger.WithContext(ctx).WithField("file", fmt.Sprintf("%s(%d)", file, len)).Warn(args...)
+	} else {
+		loger.WithContext(ctx).Warn(args...)
+	}
+}
+
+func LogError(ctx context.Context, args ...interface{}) {
+	if _, file, len, ok := runtime.Caller(1); ok {
+		loger.WithContext(ctx).WithField("file", fmt.Sprintf("%s(%d)", file, len)).Error(args...)
+	} else {
+		loger.WithContext(ctx).Error(args...)
+	}
+}
+
+func LogFatal(ctx context.Context, args ...interface{}) {
+	if _, file, len, ok := runtime.Caller(1); ok {
+		loger.WithContext(ctx).WithField("file", fmt.Sprintf("%s(%d)", file, len)).Fatal(args...)
+	} else {
+		loger.WithContext(ctx).Fatal(args...)
+	}
+}
+
+func LogPanic(ctx context.Context, args ...interface{}) {
+	if _, file, len, ok := runtime.Caller(1); ok {
+		loger.WithContext(ctx).WithField("file", fmt.Sprintf("%s(%d)", file, len)).Panic(args...)
+	} else {
+		loger.WithContext(ctx).Panic(args...)
+	}
 }
 
 func ShutDown(ctx context.Context) (err error) {

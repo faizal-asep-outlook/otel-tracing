@@ -22,3 +22,35 @@ func (t *otelTracing) TraceStart(ctx context.Context, name string) (context.Cont
 func (t *otelTracing) ShutDown(ctx context.Context) error {
 	return ShutDown(ctx)
 }
+
+func (t *otelTracing) LogTrace(ctx context.Context, args ...interface{}) {
+	LogTrace(ctx, args...)
+}
+
+func (t *otelTracing) LogDebug(ctx context.Context, args ...interface{}) {
+	LogDebug(ctx, args...)
+}
+
+func (t *otelTracing) LogPrint(ctx context.Context, args ...interface{}) {
+	LogPrint(ctx, args...)
+}
+
+func (t *otelTracing) LogInfo(ctx context.Context, args ...interface{}) {
+	LogInfo(ctx, args...)
+}
+
+func (t *otelTracing) LogWarn(ctx context.Context, args ...interface{}) {
+	LogWarn(ctx, args...)
+}
+
+func (t *otelTracing) LogError(ctx context.Context, args ...interface{}) {
+	LogError(ctx, args...)
+}
+
+func (t *otelTracing) LogFatal(ctx context.Context, args ...interface{}) {
+	LogFatal(ctx, args...)
+}
+
+func (t *otelTracing) LogPanic(ctx context.Context, args ...interface{}) {
+	LogPanic(ctx, args...)
+}
