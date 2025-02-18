@@ -34,5 +34,6 @@ func main() {
 	})
 
 	r.Run(":8080")
+	trace.ShutDown(context.Background())
 }
 ```

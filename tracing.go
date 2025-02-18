@@ -9,15 +9,18 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var Tracer oteltrace.Tracer
+var tracerprovider *sdktrace.TracerProvider
 
 type OtelTracing interface {
 	MiddlewareGinTrace() gin.HandlerFunc
 	TraceStart(ctx context.Context, name string) (context.Context, oteltrace.Span)
+	ShutDown(ctx context.Context) error
 }
 
 func InitTracer() (OtelTracing, error) {
@@ -39,12 +42,9 @@ func InitTracer() (OtelTracing, error) {
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 	otel.Tracer("gin-server")
-
+	tracerprovider = tp
 	Tracer = tp.Tracer(config.ServiceName)
-	return &otelTracing{
-		tp:     tp,
-		tracer: Tracer,
-	}, nil
+	return &otelTracing{}, nil
 }
 
 // TraceStart starts a new span with the given name. The span must be ended by calling End.
@@ -93,6 +93,10 @@ func MiddlewareGinTrace() gin.HandlerFunc {
 			}
 		}
 	}
+}
+
+func ShutDown(ctx context.Context) error {
+	return tracerprovider.Shutdown(ctx)
 }
 
 func _serverStatus(code int) (codes.Code, string) {
