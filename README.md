@@ -33,9 +33,9 @@ func main() {
 	)
 
 	r.GET("/ping", func(c *gin.Context) {
-		_, span := trace.TraceStart(c.Request.Context(), "ping process")
+		ctx, span := trace.TraceStart(c.Request.Context(), "ping process")
 		defer span.End()
-		log.WithContext(c.Request.Context()).Info("testing")
+		log.WithContext(ctx).Info("testing")
 		c.String(http.StatusOK, "pong")
 	})
 
