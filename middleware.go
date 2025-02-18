@@ -27,8 +27,18 @@ func MiddlewareGinTrace() gin.HandlerFunc {
 			oteltrace.WithAttributes(semconv.HTTPRoute(c.FullPath())),
 			oteltrace.WithSpanKind(oteltrace.SpanKindServer),
 		}
+		scheme := "http"
+		if c.Request.TLS != nil {
+			scheme = "https"
+		}
 
-		spanName := c.FullPath()
+		path := fmt.Sprintf("%s://%s%s", scheme, c.Request.Host, c.Request.URL.Path)
+		raw := c.Request.URL.RawQuery
+		if raw != "" {
+			path = path + "?" + raw
+		}
+
+		spanName := path
 		if spanName == "" {
 			spanName = fmt.Sprintf("HTTP %s route not found", c.Request.Method)
 		}
