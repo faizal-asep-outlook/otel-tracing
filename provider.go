@@ -3,7 +3,9 @@ package otelTracing
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/faizal-asep-outlook/otel-tracing/config"
 	"google.golang.org/grpc/credentials"
@@ -11,16 +13,18 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
-
-	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 )
 
 // newLoggerProvider creates a new logger provider with the OTLP gRPC exporter.
@@ -101,6 +105,46 @@ func newTracerProvider(ctx context.Context, cfg config.Config, res *resource.Res
 	return tp, nil
 }
 
+// newMeterProvider creates a new meter provider with the OTLP gRPC exporter.
+func newMeterProvider(ctx context.Context, cfg config.Config, res *resource.Resource) (*sdkmetric.MeterProvider, error) {
+	var (
+		exporter sdkmetric.Exporter
+		err      error
+	)
+
+	if cfg.OtlpEndpoint == "" {
+		exporter, err = stdoutmetric.New(stdoutmetric.WithPrettyPrint())
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		var secureOption otlpmetricgrpc.Option
+
+		if !cfg.Insecure {
+			secureOption = otlpmetricgrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, ""))
+		} else {
+			secureOption = otlpmetricgrpc.WithInsecure()
+		}
+
+		exporter, err = otlpmetricgrpc.New(
+			ctx,
+			secureOption,
+			otlpmetricgrpc.WithEndpoint(cfg.OtlpEndpoint),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create OTLP metric exporter: %w", err)
+		}
+	}
+
+	mp := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)),
+		sdkmetric.WithResource(res),
+	)
+	otel.SetMeterProvider(mp)
+
+	return mp, nil
+}
+
 // newResource creates a new OTEL resource with the service name and version.
 func newResource(ctx context.Context, cfg config.Config) (*resource.Resource, error) {
 	return resource.New(
@@ -117,4 +161,11 @@ func newResource(ctx context.Context, cfg config.Config) (*resource.Resource, er
 			attribute.String("environment", os.Getenv("GO_ENV")),
 		),
 	)
+}
+
+func newHttpClient() *http.Client {
+	return &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+	}
 }

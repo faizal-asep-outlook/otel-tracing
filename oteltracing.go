@@ -2,6 +2,9 @@ package otelTracing
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -12,6 +15,10 @@ type otelTracing struct {
 
 func (t *otelTracing) MiddlewareGinTrace() gin.HandlerFunc {
 	return MiddlewareGinTrace()
+}
+
+func (t *otelTracing) MiddlewareLogger() gin.HandlerFunc {
+	return MiddlewareLogger()
 }
 
 // TraceStart starts a new span with the given name. The span must be ended by calling End.
@@ -53,4 +60,20 @@ func (t *otelTracing) LogFatal(ctx context.Context, args ...interface{}) {
 
 func (t *otelTracing) LogPanic(ctx context.Context, args ...interface{}) {
 	LogPanic(ctx, args...)
+}
+
+func (t *otelTracing) HttpDo(ctx context.Context, req *http.Request) (*http.Response, error) {
+	return HttpDo(ctx, req)
+}
+
+func (t *otelTracing) HttpGet(ctx context.Context, url string) (*http.Response, error) {
+	return HttpGet(ctx, url)
+}
+
+func (t *otelTracing) HttpPost(ctx context.Context, url, contentType string, body io.Reader) (*http.Response, error) {
+	return HttpPost(ctx, url, contentType, body)
+}
+
+func (t *otelTracing) HttpPostForm(ctx context.Context, url string, data url.Values) (*http.Response, error) {
+	return HttpPostForm(ctx, url, data)
 }

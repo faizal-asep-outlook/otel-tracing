@@ -3,7 +3,11 @@ package otelTracing
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"runtime"
+	"strings"
 
 	"github.com/faizal-asep-outlook/otel-tracing/config"
 	"github.com/gin-gonic/gin"
@@ -11,8 +15,10 @@ import (
 	"go.opentelemetry.io/contrib/bridges/otellogrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
+	otelmetric "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
@@ -20,7 +26,10 @@ import (
 var Tracer oteltrace.Tracer
 var tracerprovider *sdktrace.TracerProvider
 var logprovider *sdklog.LoggerProvider
+var meterprovider *sdkmetric.MeterProvider
 var loger *logrus.Logger
+var httpclient *http.Client
+var meter otelmetric.Meter
 
 type noopWriter struct{}
 
@@ -29,9 +38,12 @@ func (noopWriter) Write(p []byte) (n int, err error) {
 }
 
 type OtelTracing interface {
-	MiddlewareGinTrace() gin.HandlerFunc
 	TraceStart(ctx context.Context, name string) (context.Context, oteltrace.Span)
 	ShutDown(ctx context.Context) error
+
+	MiddlewareGinTrace() gin.HandlerFunc
+	MiddlewareLogger() gin.HandlerFunc
+
 	LogTrace(ctx context.Context, args ...interface{})
 	LogDebug(ctx context.Context, args ...interface{})
 	LogPrint(ctx context.Context, args ...interface{})
@@ -40,6 +52,11 @@ type OtelTracing interface {
 	LogError(ctx context.Context, args ...interface{})
 	LogFatal(ctx context.Context, args ...interface{})
 	LogPanic(ctx context.Context, args ...interface{})
+
+	HttpDo(ctx context.Context, req *http.Request) (*http.Response, error)
+	HttpGet(ctx context.Context, url string) (*http.Response, error)
+	HttpPost(ctx context.Context, url, contentType string, body io.Reader) (*http.Response, error)
+	HttpPostForm(ctx context.Context, url string, data url.Values) (*http.Response, error)
 }
 
 func InitTracer() (OtelTracing, error) {
@@ -74,10 +91,19 @@ func InitTracer() (OtelTracing, error) {
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 	otel.Tracer("gin-server")
 
+	mp, err := newMeterProvider(ctx, config, rp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create meter: %w", err)
+	}
+	//
+
+	httpclient = newHttpClient()
 	logprovider = lp
 	tracerprovider = tp
+	meterprovider = mp
 	loger = log
 	Tracer = tp.Tracer(config.ServiceName)
+	meter = mp.Meter(config.ServiceName)
 	return &otelTracing{}, nil
 }
 
@@ -151,11 +177,40 @@ func LogPanic(ctx context.Context, args ...interface{}) {
 	}
 }
 
+func HttpDo(ctx context.Context, req *http.Request) (*http.Response, error) {
+	return httpclient.Do(req.WithContext(ctx))
+}
+
+func HttpGet(ctx context.Context, url string) (*http.Response, error) {
+	// return otelhttp.Get(ctx, url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	return HttpDo(ctx, req)
+}
+
+func HttpPost(ctx context.Context, url, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPost, url, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+	return HttpDo(ctx, req)
+}
+
+func HttpPostForm(ctx context.Context, url string, data url.Values) (*http.Response, error) {
+	return HttpPost(ctx, url, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+}
+
 func ShutDown(ctx context.Context) (err error) {
 	if err = logprovider.Shutdown(ctx); err != nil {
 		return
 	}
 	if err = tracerprovider.Shutdown(ctx); err != nil {
+		return
+	}
+	if err = meterprovider.Shutdown(ctx); err != nil {
 		return
 	}
 	return
