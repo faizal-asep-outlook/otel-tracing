@@ -120,32 +120,43 @@ func MiddlewareMeter() gin.HandlerFunc {
 		log.Fatalln(fmt.Errorf("failed to create counter: %w", err))
 	}
 
+	// init metric, here we are using counter for capturing total request
+	totalCounter, err := MeterInt64TotalCounter(MetricRequestCounter)
+	if err != nil {
+		log.Fatalln(fmt.Errorf("failed to create total counter: %w", err))
+	}
 	return func(c *gin.Context) {
 		// capture the start time of the request
 		startTime := time.Now()
 
 		// define metric attributes
 
-		attrs := metric.WithAttributes(semconv.HTTPRoute(c.FullPath()))
+		attrs := metric.WithAttributes(
+			semconv.HTTPRoute(c.FullPath()),
+			semconv.HTTPMethod(c.Request.Method),
+		)
 
 		// increase the number of requests in flight
 		counter.Add(c.Request.Context(), 1, attrs)
 
 		// execute next http handler
 		c.Next()
-
+		attrs = metric.WithAttributes(
+			semconv.HTTPRoute(c.FullPath()),
+			semconv.HTTPMethod(c.Request.Method),
+			semconv.HTTPStatusCode(c.Writer.Status()),
+		)
 		// record the request duration
 		duration := time.Since(startTime)
 		histogram.Record(
 			c.Request.Context(),
 			duration.Milliseconds(),
-			metric.WithAttributes(
-				semconv.HTTPRoute(c.FullPath()),
-			),
+			attrs,
 		)
 
 		// decrease the number of requests in flight
 		counter.Add(c.Request.Context(), -1, attrs)
+		totalCounter.Add(c.Request.Context(), 1, attrs)
 	}
 }
 
@@ -158,7 +169,7 @@ type Metric struct {
 
 // MetricRequestDurationMillis is a metric that measures the latency of HTTP requests processed by the server, in milliseconds.
 var MetricRequestDurationMillis = Metric{
-	Name:        "request_duration_millis",
+	Name:        "request_duration",
 	Unit:        "ms",
 	Description: "Measures the latency of HTTP requests processed by the server, in milliseconds.",
 }
@@ -168,6 +179,13 @@ var MetricRequestsInFlight = Metric{
 	Name:        "requests_inflight",
 	Unit:        "{count}",
 	Description: "Measures the number of requests currently being processed by the server.",
+}
+
+// MetricRequestCounter is a metric that counts the total number of requests processed by the server.
+var MetricRequestCounter = Metric{
+	Name:        "requests_total",
+	Unit:        "{count}",
+	Description: "Total number of processed requests",
 }
 
 // MeterInt64Histogram creates a new int64 histogram metric.
@@ -195,6 +213,21 @@ func MeterInt64UpDownCounter(metric Metric) (otelmetric.Int64UpDownCounter, erro
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create counter: %w", err)
+	}
+
+	return counter, nil
+}
+
+// MeterInt64TotalCounter creates a new int64 total counter metric.
+func MeterInt64TotalCounter(metric Metric) (otelmetric.Int64Counter, error) {
+	counter, err := meter.Int64Counter(
+		metric.Name,
+		otelmetric.WithDescription(metric.Description),
+		otelmetric.WithUnit(metric.Unit),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create total counter: %w", err)
 	}
 
 	return counter, nil

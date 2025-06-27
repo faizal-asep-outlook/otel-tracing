@@ -217,11 +217,11 @@ func ShutDown(ctx context.Context) (err error) {
 }
 
 func _serverStatus(code int) (codes.Code, string) {
-	if code < 100 || code >= 600 {
-		return codes.Error, fmt.Sprintf("Invalid HTTP status code %d", code)
-	}
-	if code >= 500 {
+	if code >= 200 && code <= 299 {
+		return codes.Ok, ""
+	} else if code >= 400 && code <= 511 {
 		return codes.Error, ""
+	} else {
+		return codes.Unset, fmt.Sprintf("unexpected status code: %d", code)
 	}
-	return codes.Unset, ""
 }
